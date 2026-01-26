@@ -39,6 +39,8 @@ jobs:
 
       - name: Generate autograding report
         uses: education/autograding-grading-reporter@v1
+        with:
+          runners: test-critical-classification,test-moderate-classification,test-insert-alert,test-architecture
         env:
           CRITICAL_CLASSIFICATION_RESULTS: "${{steps.autograding.outputs.test-critical-classification}}"
           MODERATE_CLASSIFICATION_RESULTS: "${{steps.autograding.outputs.test-moderate-classification}}"
