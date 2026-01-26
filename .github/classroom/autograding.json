@@ -1,0 +1,44 @@
+{
+  "tests": [
+    {
+      "name": "Domain - Classify CRITICAL Alerts",
+      "setup": "pip install -q pytest",
+      "run": "pytest tests/test_week1.py::test_classify_alert_critical -v",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 20
+    },
+    {
+      "name": "Domain - Classify MODERATE Alerts",
+      "setup": "",
+      "run": "pytest tests/test_week1.py::test_classify_alert_moderate -v",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 20
+    },
+    {
+      "name": "Infrastructure - Insert Alert",
+      "setup": "",
+      "run": "pytest tests/test_week1.py::test_insert_alert -v",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 25
+    },
+    {
+      "name": "Architecture - Domain/Infrastructure Separation",
+      "setup": "",
+      "run": "pytest tests/test_week1.py::test_domain_infrastructure_separation -v",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 35
+    }
+  ]
+}

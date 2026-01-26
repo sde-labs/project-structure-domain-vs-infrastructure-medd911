@@ -1,0 +1,48 @@
+name: GitHub Classroom Workflow
+
+on: 
+  push:
+    branches:
+    - '*'
+    - '!status'
+    - '!feedback'
+
+  workflow_dispatch:
+
+permissions:
+  checks: write
+  actions: read
+  contents: read
+
+jobs:
+  build:
+    name: Autograding
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-classroom[bot]'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run autograding tests
+        uses: education/autograding@v1
+        continue-on-error: true
+
+      - name: Generate autograding report
+        uses: education/autograding-grading-reporter@v1
+        with:
+          runners: test-critical-classification,test-moderate-classification,test-insert-alert,test-architecture
+        env:
+          CRITICAL_CLASSIFICATION_RESULTS: "${{steps.autograding.outputs.test-critical-classification}}"
+          MODERATE_CLASSIFICATION_RESULTS: "${{steps.autograding.outputs.test-moderate-classification}}"
+          INSERT_ALERT_RESULTS: "${{steps.autograding.outputs.test-insert-alert}}"
+          ARCHITECTURE_RESULTS: "${{steps.autograding.outputs.test-architecture}}"
