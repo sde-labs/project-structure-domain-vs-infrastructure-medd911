@@ -19,8 +19,6 @@ def insert_heartbeat(conn, site_id: str, timestamp: str):
 def insert_alert(conn, timestamp: str, site_id: str, alert_type: str, 
                 severity: str, latitude: float, longitude: float):
     """
-    TODO: Implement alert insertion.
-    
     Persists alert data to the database.
     
     Args:
@@ -32,8 +30,13 @@ def insert_alert(conn, timestamp: str, site_id: str, alert_type: str,
         latitude: Site latitude
         longitude: Site longitude
     """
-    # TODO: Implement this function
-    pass
+    cursor = conn.cursor()
+    cursor.execute(
+        """INSERT INTO alerts (timestamp, site_id, alert_type, severity, latitude, longitude) 
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (timestamp, site_id, alert_type, severity, latitude, longitude)
+    )
+    conn.commit()
 
 
 def get_all_alerts(conn):

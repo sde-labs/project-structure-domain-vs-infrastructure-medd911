@@ -17,9 +17,8 @@ def validate_heartbeat(site_id: str, timestamp: str) -> bool:
 
 def classify_alert(alert_type: str) -> str:
     """
-    TODO: Implement alert classification logic.
-    
     Takes an alert type and returns its severity level.
+    
     Business rules:
     - LEAK: CRITICAL
     - BLOCKAGE: CRITICAL
@@ -33,5 +32,6 @@ def classify_alert(alert_type: str) -> str:
     Returns:
         "CRITICAL" or "MODERATE"
     """
-    # TODO: Implement this function
-    pass
+    if alert_type in ["LEAK", "BLOCKAGE"]:
+        return "CRITICAL"
+    return "MODERATE"
