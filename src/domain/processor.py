@@ -16,22 +16,13 @@ def validate_heartbeat(site_id: str, timestamp: str) -> bool:
 
 
 def classify_alert(alert_type: str) -> str:
-    """
-    TODO: Implement alert classification logic.
-    
-    Takes an alert type and returns its severity level.
-    Business rules:
-    - LEAK: CRITICAL
-    - BLOCKAGE: CRITICAL
-    - PRESSURE: MODERATE
-    - TEMPERATURE: MODERATE
-    - ACOUSTIC: MODERATE
-    
-    Args:
-        alert_type: One of PRESSURE, TEMPERATURE, LEAK, ACOUSTIC, BLOCKAGE
-        
-    Returns:
-        "CRITICAL" or "MODERATE"
-    """
-    # TODO: Implement this function
-    pass
+    classification = {
+        "PRESSURE": "MODERATE",
+        "TEMPERATURE": "MODERATE",
+        "LEAK": "CRITICAL",
+        "ACOUSTIC": "MODERATE",
+        "BLOCKAGE": "CRITICAL",
+    }
+
+    return classification.get(alert_type, "MODERATE")
+
