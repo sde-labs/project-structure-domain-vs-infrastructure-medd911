@@ -65,6 +65,5 @@ def test_domain_infrastructure_separation():
     # Check that domain doesn't import from infrastructure
     assert "from infrastructure" not in source and "from src.infrastructure" not in source, \
         "Domain layer should not import from infrastructure layer"
- 
     assert "import infrastructure" not in source and "import src.infrastructure" not in source, \
         "Domain layer should not import from infrastructure layer"
