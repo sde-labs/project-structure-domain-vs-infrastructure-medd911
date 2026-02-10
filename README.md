@@ -1,120 +1,79 @@
-# Week 2: Type Validation with Pydantic
+# Week 3: Environment Variables & Secrets
 
 ## Learning Objectives
 By the end of this lesson, you will:
-- Understand why validation at boundaries prevents bugs
-- Learn to use Pydantic for data validation
-- Enforce business rules through type constraints
-- Recognize the difference between validation and business logic
+- Understand why secrets should never be hardcoded or committed
+- Learn how environment variables separate code from configuration (local dev vs CI)
+- Validate configuration early to fail fast (just like Week 2 input validation)
+- Recognize the boundary between config validation and business logic (config is neither infra nor domain)
 
 ---
 
-## The Problem with Week 1 Code
+## The Problem with Week 2 Code
 
-In Week 1, we built a clean architecture with separated Domain and Infrastructure layers. **But there's a critical flaw:**
+We validated data, but configuration is still implicit. That leads to brittle deployments and leaked secrets.
 
 ```python
-# This code will happily accept garbage data!
-process_alert_reading(
-    conn,
-    timestamp="2024-99-99T99:99:99Z", # ❌
-    site_id="SITE_001",
-    alert_type="RAINING_UNICORNS",  # ❌
-    latitude=999.9,              # ❌
-    longitude=-999.9             # ❌
-)
+# Hardcoded values or hidden assumptions
+database_url = "alerts.db"          # ❌
+api_token = "replace-me"            # ❌
 ```
 
 **What happens?**
-1. ✅ Code runs without errors
-2. ❌ Invalid data gets stored in the database
-3. ❌ Downstream systems fail when they encounter bad data
-4. ❌ You discover the problem hours or days later
+1. ✅ Code runs locally
+2. ❌ Secrets end up in source control
+3. ❌ Prod needs different config than dev/test
+4. ❌ CI (GitHub Actions) doesn't have your laptop's `.env` or shell exports, so failures show up in CI first
 
 ---
 
-## The Solution: Validate at Boundaries
+## The Solution: Environment Variables
 
-**Validate data as soon as it enters your system** using type validation.
+Environment variables keep config out of code. Validate them at startup so failures are immediate.
 
-### Enter Pydantic
-
-Pydantic is Python's industry-standard library for data validation. It:
-- ✅ Validates data types automatically
-- ✅ Enforces custom business rules
-- ✅ Raises clear errors when data is invalid
-- ✅ Integrates seamlessly with type hints
+### Enter python-dotenv and gh-secrets
+`python-dotenv` loads local `.env` values for development (never commit `.env`). In CI, use GitHub Secrets (`gh secret set -f .env` or UI) to provide the same variables.
 
 ---
 
-## Your Assignment
-
-You'll harden the Week 1 code by adding Pydantic validation to the `Alert` model.
-
-### What You Need to Do
-
-**In `domain/models.py`**: Add three validators to the `Alert` model
-
-The file already has TODOs marked. You need to implement:
-
-1. **Latitude Validator**
-   - Must be between -90 and 90
-   - Raise `ValueError` with a clear message if invalid
-
-2. **Longitude Validator**
-   - Must be between -180 and 180
-   - Raise `ValueError` with a clear message if invalid
-
-3. **Alert Type Validator**
-   - Must be one of: `LEAK`, `BLOCKAGE`, `PRESSURE`, `TEMPERATURE`, `ACOUSTIC`
-   - Raise `ValueError` listing valid types if invalid
-
-4. **Bonus: Timestamp Validator**
-
-### Example Validator Pattern
-
-Here's the pattern for Pydantic validators:
+## Example Pattern
 
 ```python
+import os
+from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator
 
-class MyModel(BaseModel):
-    my_field: float
-    
-    @field_validator('my_field')
-    def validate_my_field(cls, v):
-        if v < 0:
-            raise ValueError('my_field must be positive')
+class Settings(BaseModel):
+    env: str
+    database_url: str
+    api_token: str
+
+    @classmethod
+    def from_env(cls):
+        load_dotenv()
+        return cls(
+            env=os.getenv("APP_ENV"),
+            database_url=os.getenv("DATABASE_URL"),
+            api_token=os.getenv("API_TOKEN"),
+        )
+
+    @field_validator("env")
+    def validate_env(cls, v):
+        if v not in {"dev", "test", "prod"}:
+            raise ValueError("env must be one of: dev, test, prod")
         return v
 ```
-
-**Key points:**
-- Use the `@field_validator('field_name')` decorator
-- Method signature: `def method_name(cls, v)`
-- Raise `ValueError` with descriptive message
-- Return the value if valid
 
 ---
 
 ## Understanding the Architecture
 
-### Where Does Validation Belong? - Revistting Week 1
+### Where Does Configuration Belong?
 
-**Question:** Is validation part of the Domain layer or Infrastructure layer?
+Configuration is not business logic. It sits at the boundary and should be validated before your domain logic runs.
 
-**Answer:** It depends on the *type* of validation.
-
-**Domain Validation (Business Rules):**
-- Example: "Latitude must be -90 to 90" ← This is a fact about Earth
-- Example: "Alert types are LEAK, BLOCKAGE, etc." ← This is a business domain concept
-- **These belong in Domain models** ✅
-
-**Infrastructure Validation (I/O Constraints):**
-- Example: "JSON must be valid UTF-8"
-- Example: "Request body cannot exceed 1MB"
-- **These belong in Infrastructure** ✅
-
-For Week 2, all our validators are **domain rules**, so they go in `domain/models.py`.
+- **Config validation**: Boundary/infrastructure concern - validate once at startup, then pass safe values inward
+- **Business validation**: Domain concern - validate inputs and rules that exist even without deployment
 
 ---
 
@@ -122,83 +81,72 @@ For Week 2, all our validators are **domain rules**, so they go in `domain/model
 
 ### Run Tests Locally
 ```bash
-pytest tests/test_week1.py -v  # Should still pass
-pytest tests/test_week2.py -v  # Should pass after implementing validators
+pytest tests/test_week3.py -v  # Should pass after implementing config, and prior weeks should still pass
 ```
+
+Local: use `.env` or exports. CI: set repo secrets. Missing secrets should fail fast.
 
 ### Expected Behavior
 
-**Valid data (should work):**
-```python
-alert = Alert(
-    timestamp="2024-01-26T10:00:00Z",
-    site_id="SITE_001",
-    alert_type="LEAK",
-    severity="CRITICAL",
-    latitude=29.7604,
-    longitude=-95.3698
-)
-print(alert)  # ✅ Works!
+**Valid config (should work):**
+```dotenv
+APP_ENV=dev
+DATABASE_URL=alerts.db
+API_TOKEN=replace-me
 ```
 
-**Invalid data (should raise ValidationError):**
-```python
-from pydantic import ValidationError
-
-try:
-    alert = Alert(
-        timestamp="2024-01-26T10:00:00Z",
-        site_id="SITE_001",
-        alert_type="LEAK",
-        severity="CRITICAL",
-        latitude=999.9,  # ❌ Invalid
-        longitude=-95.3698
-    )
-except ValidationError as e:
-    print(f"Validation failed: {e}")
-    # Validation failed: 1 validation error for Alert
-    # latitude
-    #   Value error, latitude must be between -90 and 90
-```
+**CI setup (GitHub Actions): set repo secrets using your preferred method**
+UI: `Settings -> Secrets and variables -> Actions -> New repository secret`
+CLI: `gh secret set -f .env`
 
 ---
 
 ## Real-World Connection
 
-### Where You'll Use This
-
-**Data Engineering Pipelines:**
-- Validate incoming data from APIs, Kafka, or S3 before processing
-- Catch schema changes early before they break downstream jobs
-- Example: "This JSON from the vendor API looks weird..."
-- Ensure data quality before loading into data warehouse
+### Where You’ll Use This
+- Deployments where config differs per environment
+- CI systems (like GitHub Actions) injecting credentials at runtime
 
 ### Industry Standard
-
-**Pydantic is used in:**
-- Notable companies including Netflix, Microsoft, AWS, Uber.
-- FastAPI 
-- Data pipeline tools (Dagster, Prefect)
-- ML model serving (validating inference inputs)
+- Docker Compose: direct `.env` interpolation for service config
+- GitHub Actions: `gh secret set -f .env` to import dotenv keys as secrets
+- `python-dotenv`: direct `.env` loading in app startup
+- 12-factor apps: config in environment, not in code
 
 ---
 
 ## Discussion Questions
 
-**Production Scenario:** You're ingesting oil well sensor data from 10,000 wells via Kafka. One well starts sending `latitude=null`. Without validation, what breaks? With validation, what happens?
+**Production Scenario:** A developer accidentally checks in a `.env` file with a real API token. What could go wrong? How do you prevent it? How do you remediate it?
+
+---
+
+## Your Assignment
+
+Implement the Week 3 config layer.
+
+**In `src/config/settings.py`:**
+1. Implement `from_env()` using `python-dotenv`.
+2. Require `APP_ENV`, `DATABASE_URL`, `API_TOKEN`.
+3. Validate:
+   - `env` in `dev | test | prod`
+   - `database_url` is non-empty and ends with `.db`
+   - `api_token` is non-empty
+
+**In `src/main.py`:**
+- Implement `load_settings()` to return `Settings.from_env()`.
 
 ---
 
 ## Next Week Preview
 
-Week 3 will introduce **error handling and logging**. You'll learn how to gracefully handle validation failures, log them properly, and ensure your pipeline is observable in production.
+Week 4 will introduce **error handling and logging**, so failures become visible and debuggable in production.
 
 ---
 
 ## Success Criteria
 
-- ✅ All tests from this week and prior weeks pass (100 pts)
-  - ✅ Invalid latitude/longitude are rejected 
-  - ✅ Invalid alert types are rejected
-  - ✅ Valid boundary values are accepted
-
+- ✅ All tests from this week and prior weeks pass
+- ✅ Missing env vars fail fast
+- ✅ Invalid config is rejected
+- ✅ Valid config loads cleanly

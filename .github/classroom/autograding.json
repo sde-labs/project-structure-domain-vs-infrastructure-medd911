@@ -69,6 +69,66 @@
       "comparison": "included",
       "timeout": 10,
       "points": 40
+    },
+    {
+      "name": "Week 3 - Config - Load Valid Settings",
+      "setup": "",
+      "run": "pytest tests/test_week3.py::test_valid_settings_loaded -v",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 30
+    },
+    {
+      "name": "Week 3 - Config - Missing Required Env Var",
+      "setup": "",
+      "run": "pytest tests/test_week3.py::test_missing_required_env_var_rejected -v",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 20
+    },
+    {
+      "name": "Week 3 - Config - Reject Invalid Env",
+      "setup": "",
+      "run": "pytest tests/test_week3.py::test_invalid_env_rejected -v",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 20
+    },
+    {
+      "name": "Week 3 - Config - Reject Invalid Database URL",
+      "setup": "",
+      "run": "pytest tests/test_week3.py::test_invalid_database_url_rejected -v",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 15
+    },
+    {
+      "name": "Week 3 - Config - Reject Empty API Token",
+      "setup": "",
+      "run": "pytest tests/test_week3.py::test_empty_api_token_rejected -v",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 15
+    },
+    {
+      "name": "Week 3 - CI Secrets - Runtime Env Present",
+      "setup": "",
+      "run": "pytest tests/test_week3.py::test_runtime_env_required_for_ci_secret_flow -v",
+      "input": "",
+      "output": "",
+      "comparison": "included",
+      "timeout": 10,
+      "points": 20
     }
   ]
 }
