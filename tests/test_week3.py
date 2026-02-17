@@ -14,6 +14,18 @@ from src.config.settings import Settings
 
 
 def _set_env(monkeypatch, **values):
+    """
+    Helper to isolate environment variables per test.
+
+    This ensures values from a real local .env file do NOT leak into tests.
+    """
+    required = ["APP_ENV", "DATABASE_URL", "API_TOKEN"]
+
+    # Clear all required vars first
+    for key in required:
+        monkeypatch.delenv(key, raising=False)
+
+    # Set only the variables needed for this test
     for key, value in values.items():
         monkeypatch.setenv(key, value)
 
@@ -37,6 +49,7 @@ def test_missing_required_env_var_rejected(monkeypatch):
         monkeypatch,
         APP_ENV="dev",
         API_TOKEN="secret-token",
+        # DATABASE_URL intentionally missing
     )
 
     with pytest.raises(ValueError) as exc_info:
