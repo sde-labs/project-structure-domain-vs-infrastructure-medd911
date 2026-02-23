@@ -5,6 +5,7 @@ import os
 import sys
 
 import pytest
+from dotenv import load_dotenv
 from pydantic import ValidationError
 
 # Add parent directory to path
@@ -14,18 +15,9 @@ from src.config.settings import Settings
 
 
 def _set_env(monkeypatch, **values):
-    """
-    Helper to isolate environment variables per test.
-
-    This ensures values from a real local .env file do NOT leak into tests.
-    """
-    required = ["APP_ENV", "DATABASE_URL", "API_TOKEN"]
-
-    # Clear all required vars first
-    for key in required:
+    for key in ("APP_ENV", "DATABASE_URL", "API_TOKEN"):
         monkeypatch.delenv(key, raising=False)
-
-    # Set only the variables needed for this test
+    monkeypatch.setenv("PYTHON_DOTENV_DISABLED", "1")
     for key, value in values.items():
         monkeypatch.setenv(key, value)
 
@@ -105,6 +97,8 @@ def test_empty_api_token_rejected(monkeypatch):
 
 
 def test_runtime_env_required_for_ci_secret_flow():
+    os.environ.pop("PYTHON_DOTENV_DISABLED", None)
+    load_dotenv()
     required = ("APP_ENV", "DATABASE_URL", "API_TOKEN")
     missing = [name for name in required if not os.getenv(name)]
 

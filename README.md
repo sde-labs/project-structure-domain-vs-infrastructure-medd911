@@ -1,152 +1,158 @@
-# Week 3: Environment Variables & Secrets
+# Week 4: Error Handling, Logging, and Basic Retries
 
 ## Learning Objectives
 By the end of this lesson, you will:
-- Understand why secrets should never be hardcoded or committed
-- Learn how environment variables separate code from configuration (local dev vs CI)
-- Validate configuration early to fail fast (just like Week 2 input validation)
-- Recognize the boundary between config validation and business logic (config is neither infra nor domain)
+- add helpful logs 
+- control log verbosity with environment configuration
+- use `logger.exception(...)` to preserve stack traces
+- retry transient infrastructure failures safely
+- ... all while keeping domain logic clean 
 
 ---
 
-## The Problem with Week 2 Code
+## Why This Week Matters
 
-We validated data, but configuration is still implicit. That leads to brittle deployments and leaked secrets.
+Up to Week 3, we focused on validating data and configuration early. That is necessary, but production issues still happen after startup.
 
-```python
-# Hardcoded values or hidden assumptions
-database_url = "alerts.db"          # ❌
-api_token = "replace-me"            # ❌
-```
+Common examples:
+- payload arrives with invalid values that our type validators don't catch
+- database insert fails because of a temporary lock
+- tests fail in CI with little context because logs are too sparse
 
-**What happens?**
-1. ✅ Code runs locally
-2. ❌ Secrets end up in source control
-3. ❌ Prod needs different config than dev/test
-4. ❌ CI (GitHub Actions) doesn't have your laptop's `.env` or shell exports, so failures show up in CI first
+The goal is to make failures obvious, actionable, and bounded.
 
 ---
 
-## The Solution: Environment Variables
+## Logging You Can Actually Use
 
-Environment variables keep config out of code. Validate them at startup so failures are immediate.
+Use standard levels:
+- `DEBUG` for deep troubleshooting
+- `INFO` for normal successful flow
+- `WARNING` for recoverable issues (like retries)
+- `ERROR`/`CRITICAL` for terminal failures
 
-### Enter python-dotenv and gh-secrets
-`python-dotenv` loads local `.env` values for development (never commit `.env`). In CI, use GitHub Secrets (`gh secret set -f .env` or UI) to provide the same variables.
+Use a consistent format so local logs and CI logs are easy to scan:
 
----
+`timestamp,level,msg`
 
-## Example Pattern
+In Python logging format terms:
 
-```python
-import os
-from dotenv import load_dotenv
-from pydantic import BaseModel, field_validator
+`%(asctime)s,%(levelname)s,%(message)s`
 
-class Settings(BaseModel):
-    env: str
-    database_url: str
-    api_token: str
+Also, remember the difference between:
+- `logger.error("...")` -> message only
+- `logger.exception("...")` -> message plus traceback (inside `except`)
 
-    @classmethod
-    def from_env(cls):
-        load_dotenv()
-        return cls(
-            env=os.getenv("APP_ENV"),
-            database_url=os.getenv("DATABASE_URL"),
-            api_token=os.getenv("API_TOKEN"),
-        )
-
-    @field_validator("env")
-    def validate_env(cls, v):
-        if v not in {"dev", "test", "prod"}:
-            raise ValueError("env must be one of: dev, test, prod")
-        return v
-```
+If you are catching an exception and re-raising it, `logger.exception(...)` is usually what you want.
 
 ---
 
-## Understanding the Architecture
+## When Retries Help (And When They Don’t)
 
-### Where Does Configuration Belong?
+Retries are for failures that can change between attempts.
 
-Configuration is not business logic. It sits at the boundary and should be validated before your domain logic runs.
+Good retry candidates:
+- temporary database lock
+- brief network timeout
+- transient service unavailability
 
-- **Config validation**: Boundary/infrastructure concern - validate once at startup, then pass safe values inward
-- **Business validation**: Domain concern - validate inputs and rules that exist even without deployment
+Bad retry candidates:
+- invalid data shape
+- failed regex validation
+- missing required fields
+
+Concrete example:
+- If `site_id` fails a regex check now, retrying that exact same string five times will still fail five times.
+- If DB insert fails due to a short lock, retrying may succeed on the next attempt.
+
+So this week’s rule is simple:
+- do **not** retry validation failures
+- **do** retry persistence failures up to a small, fixed limit
+
+We are keeping retries simple with a bounded attempt count (`max_retries`). In real systems, teams often add exponential backoff (wait a little longer before each retry) plus jitter to avoid synchronized retry storms.
 
 ---
 
-## Testing Your Solution
+## Golden Rules (So It Does Not Become a Swamp)
 
-### Run Tests Locally
-```bash
-pytest tests/test_week3.py -v  # Should pass after implementing config, and prior weeks should still pass
-```
+1. Validate early, outside retry loops.
+   - If input/config is invalid, fail once, log once, and return the error.
 
-Local: use `.env` or exports. CI: set repo secrets. Missing secrets should fail fast.
+2. Retry only the unstable I/O boundary.
+   - Put retries around the DB write call, not around the whole function.
 
-### Expected Behavior
+3. Keep `try/except` as narrow as possible.
+   - Catch `ValidationError` around validation.
+   - Catch runtime exceptions around persistence.
 
-**Valid config (should work):**
+4. Log once per decision point.
+   - `DEBUG`: start/context
+   - `WARNING`: each retry attempt
+   - `INFO`: success
+   - `exception(...)`: terminal failure before re-raise
+
+5. Re-raise after terminal failure.
+   - Logging is observability, not recovery by itself.
+
+If you follow these five rules, your code stays readable and your logs stay useful.
+
+---
+
+## Assignment
+
+Implement Week 4 in the existing project.
+
+### 1) Extend config in `src/config/settings.py`
+- Add `log_level` to `Settings` with default `INFO`.
+- Update `from_env()` to read `LOG_LEVEL` (default `INFO`).
+- Validate allowed values: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`.
+
+### 2) Implement orchestration in `src/main.py`
+- Implement `load_settings()`.
+- Implement `build_logger(log_level, stream=None)`:
+  - logger name: `oil_well_monitoring`
+  - format: `%(asctime)s,%(levelname)s,%(message)s`
+  - avoid duplicate handlers in repeated calls
+- Implement `process_alert_event(..., max_retries=2)`:
+  - validate with `Alert`
+  - classify + persist using existing code
+  - retry persistence failures up to `max_retries`
+  - log retry attempts with `WARNING`
+  - on validation failure: `logger.exception(...)` then re-raise
+  - on final persistence failure: `logger.exception(...)` then re-raise
+  - on success: log at `INFO`
+
+### 3) Local debugging toggle in `.env`
+
+Set:
+
 ```dotenv
-APP_ENV=dev
-DATABASE_URL=alerts.db
-API_TOKEN=replace-me
+LOG_LEVEL=DEBUG
 ```
 
-**CI setup (GitHub Actions): set repo secrets using your preferred method**
-UI: `Settings -> Secrets and variables -> Actions -> New repository secret`
-CLI: `gh secret set -f .env`
+Use this while debugging so debug lines appear. Tests should still pass with default `INFO` behavior.
 
 ---
 
-## Real-World Connection
+## Testing
 
-### Where You’ll Use This
-- Deployments where config differs per environment
-- CI systems (like GitHub Actions) injecting credentials at runtime
-
-### Industry Standard
-- Docker Compose: direct `.env` interpolation for service config
-- GitHub Actions: `gh secret set -f .env` to import dotenv keys as secrets
-- `python-dotenv`: direct `.env` loading in app startup
-- 12-factor apps: config in environment, not in code
-
----
-
-## Discussion Questions
-
-**Production Scenario:** A developer accidentally checks in a `.env` file with a real API token. What could go wrong? How do you prevent it? How do you remediate it?
-
----
-
-## Your Assignment
-
-Implement the Week 3 config layer.
-
-**In `src/config/settings.py`:**
-1. Implement `from_env()` using `python-dotenv`.
-2. Require `APP_ENV`, `DATABASE_URL`, `API_TOKEN`.
-3. Validate:
-   - `env` in `dev | test | prod`
-   - `database_url` is non-empty and ends with `.db`
-   - `api_token` is non-empty
-
-**In `src/main.py`:**
-- Implement `load_settings()` to return `Settings.from_env()`.
-
----
-
-## Next Week Preview
-
-Week 4 will introduce **error handling and logging**, so failures become visible and debuggable in production.
+```bash
+pytest tests/test_week4.py -v
+pytest tests -v
+```
 
 ---
 
 ## Success Criteria
 
-- ✅ All tests from this week and prior weeks pass
-- ✅ Missing env vars fail fast
-- ✅ Invalid config is rejected
-- ✅ Valid config loads cleanly
+- ✅ Week 1-4 tests pass
+- ✅ logs follow `timestamp,level,msg`
+- ✅ debug logs appear when `LOG_LEVEL=DEBUG`
+- ✅ validation failures are logged with traceback and not retried
+- ✅ persistence failures retry up to the limit, then log and raise
+
+---
+
+## Next Week Preview
+
+Week 5 will look at authentication options, including API key auth and OAuth, and where each one fits.
