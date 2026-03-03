@@ -19,7 +19,7 @@ Typical examples:
 - trusting JWT payloads without verifying signature or `exp`
 - checking for "some scope" instead of all required scopes
 
-This week is about building guardrails that are small, boring, and dependable.
+We'll look at examples of simple but catasrtophic failures at the end of today's session.
 
 ---
 
@@ -50,6 +50,58 @@ Keep authorization explicit:
 
 ---
 
+## Useful Idioms (Keep These)
+
+1. Normalize input before checks.
+   - Example: trim header value once, then parse.
+
+2. Fail closed.
+   - If token format is odd or claims are missing, reject.
+
+3. Keep time deterministic in tests.
+   - Accept `now` as an argument instead of calling `datetime.now()` directly.
+
+4. Separate authentication from authorization.
+   - Verify token first, then check required scopes.
+
+5. Return booleans for allow/deny decisions, raise only for malformed/invalid auth artifacts.
+
+---
+
+## Real World Failures
+
+1. Auth0 JWT Mis-validation (alg: none)
+
+What happened: Auth0’s API once accepted forged JWTs by mishandling the alg: none value due to a case-sensitive filter. 😬 Attackers could craft tokens that bypassed signature checks entirely.
+
+Lesson: Always validate JWT signatures and reject insecure algorithms explicitly instead of relying on naïve filters.
+
+2. Salesforce & Gainsight OAuth Token Abuses
+
+What happened: OAuth tokens from third-party apps (like Gainsight) were abused to access Salesforce customer data at scale. Salesforce had to revoke tokens and disable many integrations.
+
+Lesson: OAuth misuse/exposure at a partner can grant broad access; verify scopes and token lifetimes, and rotate credentials regularly.
+
+3. Home Depot GitHub Token Exposure
+
+What happened: A private GitHub CI/CD token was accidentally exposed and active for almost a year, giving access to internal repos and infrastructure.
+
+Lesson: Long-lived secrets/tokens without rotation or scoped permissions are high-risk if leaked.
+
+4. Internet Archive Unrotated API Keys
+
+What happened: Unrotated API keys tied to their support platform were exploited; 800,000+ support tickets were compromised.
+
+Lesson: Not rotating or auditing tokens regularly lets stale credentials become attack vectors.
+
+5. ShinyHunters OAuth/Salesforce Campaign
+
+What happened: Attackers used stolen OAuth and refresh tokens from integrations (e.g., Salesloft Drift) to access Salesforce orgs of hundreds of companies.
+
+Lesson: Lost/compromised OAuth tokens can lead to widespread data access if scopes aren’t constrained.
+
+---
+
 ## Assignment
 
 Implement Week 6 auth helpers in `src/security/auth.py`.
@@ -73,24 +125,6 @@ Implementation notes:
 Implement:
 - `extract_bearer_token(auth_header)`
 - `token_has_required_scopes(claims, required_scopes)`
-
----
-
-## Useful Idioms (Keep These)
-
-1. Normalize input before checks.
-   - Example: trim header value once, then parse.
-
-2. Fail closed.
-   - If token format is odd or claims are missing, reject.
-
-3. Keep time deterministic in tests.
-   - Accept `now` as an argument instead of calling `datetime.now()` directly.
-
-4. Separate authentication from authorization.
-   - Verify token first, then check required scopes.
-
-5. Return booleans for allow/deny decisions, raise only for malformed/invalid auth artifacts.
 
 ---
 
