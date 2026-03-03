@@ -50,21 +50,52 @@ Keep authorization explicit:
 
 ---
 
-## Useful Idioms (Keep These)
+## Useful Idioms (Production Auth Code)
 
-1. Normalize input before checks.
-   - Example: trim header value once, then parse.
+### 1. Normalize input once, then validate
 
-2. Fail closed.
-   - If token format is odd or claims are missing, reject.
+Normalize before any checks.
+- Example: trim and canonicalize the `Authorization` header once, then parse.
+- Do not compare raw, unprocessed input.
 
-3. Keep time deterministic in tests.
-   - Accept `now` as an argument instead of calling `datetime.now()` directly.
+Why: Subtle format differences can bypass naive checks.
 
-4. Separate authentication from authorization.
-   - Verify token first, then check required scopes.
+### 2. Fail closed
 
-5. Return booleans for allow/deny decisions, raise only for malformed/invalid auth artifacts.
+If anything about the token is unexpected, reject it.
+- Missing claims
+- Unexpected algorithm
+- Malformed structure
+- Unknown issuer
+
+Never “best effort” parse security artifacts.
+
+### 3. Make time deterministic
+
+Authentication logic depends on time (`exp`, `nbf`, `iat`).
+- Accept `now` as an argument instead of calling system time directly.
+- Test exact boundary conditions explicitly.
+
+Why: Expiration edge cases are common auth failure points.
+
+### 4. Separate authentication from authorization
+
+Do not mix signature verification with scope checks.
+
+1. Verify token integrity and validity.
+2. Then enforce required scopes/roles.
+
+Never evaluate permissions on an unverified payload.
+
+### 5. Return allow/deny decisions cleanly
+
+Auth decision functions should return explicit booleans.
+
+- `True` → allowed
+- `False` → denied
+- Raise exceptions only for malformed or invalid artifacts
+
+This keeps control flow predictable and testable.
 
 ---
 
