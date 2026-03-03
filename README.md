@@ -78,23 +78,7 @@ Auth0’s API once accepted forged JWTs by mishandling the `alg: none` value due
 **Lesson:**  
 Always validate JWT signatures and explicitly reject insecure algorithms instead of relying on naïve filters.
 
-### 2. Salesforce & Gainsight OAuth Token Abuses
-
-**What happened:**  
-OAuth tokens from third-party apps (e.g., Gainsight) were abused to access Salesforce customer data at scale. Salesforce had to revoke tokens and disable many integrations.
-
-**Lesson:**  
-OAuth exposure at a partner can grant broad access. Verify scopes, limit token lifetimes, and rotate credentials regularly.
-
-### 3. Home Depot GitHub Token Exposure
-
-**What happened:**  
-A private GitHub CI/CD token was accidentally exposed and remained active for nearly a year, giving access to internal repositories and infrastructure.
-
-**Lesson:**  
-Long-lived secrets without rotation or scope restrictions become high-risk the moment they leak.
-
-### 4. Internet Archive Unrotated API Keys
+### 2. Internet Archive Unrotated API Keys
 
 **What happened:**  
 Unrotated API keys tied to their support platform were exploited, leading to compromise of 800,000+ support tickets.
@@ -102,7 +86,7 @@ Unrotated API keys tied to their support platform were exploited, leading to com
 **Lesson:**  
 Failing to rotate or audit credentials turns stale tokens into active attack vectors.
 
-### 5. ShinyHunters OAuth/Salesforce Campaign
+### 3. ShinyHunters OAuth/Salesforce Campaign
 
 **What happened:**  
 Attackers used stolen OAuth and refresh tokens from integrations (e.g., Salesloft, Drift) to access Salesforce environments across hundreds of companies.
