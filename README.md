@@ -70,35 +70,45 @@ Keep authorization explicit:
 
 ## Real World Failures
 
-1. Auth0 JWT Mis-validation (alg: none)
+### 1. Auth0 JWT Mis-validation (`alg: none`)
 
-What happened: Auth0’s API once accepted forged JWTs by mishandling the alg: none value due to a case-sensitive filter. 😬 Attackers could craft tokens that bypassed signature checks entirely.
+**What happened:**  
+Auth0’s API once accepted forged JWTs by mishandling the `alg: none` value due to a case-sensitive filter. Attackers could craft tokens that bypassed signature checks entirely.
 
-Lesson: Always validate JWT signatures and reject insecure algorithms explicitly instead of relying on naïve filters.
+**Lesson:**  
+Always validate JWT signatures and explicitly reject insecure algorithms instead of relying on naïve filters.
 
-2. Salesforce & Gainsight OAuth Token Abuses
+### 2. Salesforce & Gainsight OAuth Token Abuses
 
-What happened: OAuth tokens from third-party apps (like Gainsight) were abused to access Salesforce customer data at scale. Salesforce had to revoke tokens and disable many integrations.
+**What happened:**  
+OAuth tokens from third-party apps (e.g., Gainsight) were abused to access Salesforce customer data at scale. Salesforce had to revoke tokens and disable many integrations.
 
-Lesson: OAuth misuse/exposure at a partner can grant broad access; verify scopes and token lifetimes, and rotate credentials regularly.
+**Lesson:**  
+OAuth exposure at a partner can grant broad access. Verify scopes, limit token lifetimes, and rotate credentials regularly.
 
-3. Home Depot GitHub Token Exposure
+### 3. Home Depot GitHub Token Exposure
 
-What happened: A private GitHub CI/CD token was accidentally exposed and active for almost a year, giving access to internal repos and infrastructure.
+**What happened:**  
+A private GitHub CI/CD token was accidentally exposed and remained active for nearly a year, giving access to internal repositories and infrastructure.
 
-Lesson: Long-lived secrets/tokens without rotation or scoped permissions are high-risk if leaked.
+**Lesson:**  
+Long-lived secrets without rotation or scope restrictions become high-risk the moment they leak.
 
-4. Internet Archive Unrotated API Keys
+### 4. Internet Archive Unrotated API Keys
 
-What happened: Unrotated API keys tied to their support platform were exploited; 800,000+ support tickets were compromised.
+**What happened:**  
+Unrotated API keys tied to their support platform were exploited, leading to compromise of 800,000+ support tickets.
 
-Lesson: Not rotating or auditing tokens regularly lets stale credentials become attack vectors.
+**Lesson:**  
+Failing to rotate or audit credentials turns stale tokens into active attack vectors.
 
-5. ShinyHunters OAuth/Salesforce Campaign
+### 5. ShinyHunters OAuth/Salesforce Campaign
 
-What happened: Attackers used stolen OAuth and refresh tokens from integrations (e.g., Salesloft Drift) to access Salesforce orgs of hundreds of companies.
+**What happened:**  
+Attackers used stolen OAuth and refresh tokens from integrations (e.g., Salesloft, Drift) to access Salesforce environments across hundreds of companies.
 
-Lesson: Lost/compromised OAuth tokens can lead to widespread data access if scopes aren’t constrained.
+**Lesson:**  
+Compromised OAuth tokens can enable widespread data access if scopes are not tightly constrained.
 
 ---
 
