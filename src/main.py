@@ -34,33 +34,24 @@ def load_settings() -> Settings:
     """
     Load application settings from environment.
 
-    This fails fast if required environment variables are missing or invalid.
+    Load and validate settings.
     """
     return Settings.from_env()
 
 
 def build_logger(log_level: str, stream=None) -> logging.Logger:
-    """
-    Build and return the application logger.
-
-    - Creates/gets a logger named "oil_well_monitoring"
-    - Sets the logger level from `log_level`
-    - Attaches one StreamHandler (uses `stream` if provided, else default stderr)
-    - Format: %(asctime)s,%(levelname)s,%(message)s
-    - Clears existing handlers first to avoid duplicates across repeated calls
-    """
     logger = logging.getLogger("oil_well_monitoring")
-    logger.setLevel(getattr(logging, log_level))
+    logger.setLevel(log_level.upper())
+    logger.propagate = False
 
-    # Remove any existing handlers to avoid duplicates when called repeatedly
     logger.handlers.clear()
-
     handler = logging.StreamHandler(stream)
-    formatter = logging.Formatter(
-        fmt="%(asctime)s,%(levelname)s,%(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
+    handler.setFormatter(
+        logging.Formatter(
+            "%(asctime)s,%(levelname)s,%(message)s",
+            datefmt="%Y-%m-%dT%H:%M:%S",
+        )
     )
-    handler.setFormatter(formatter)
     logger.addHandler(handler)
 
     return logger
@@ -69,55 +60,46 @@ def build_logger(log_level: str, stream=None) -> logging.Logger:
 def process_alert_event(conn, logger: logging.Logger, timestamp: str, site_id: str,
                         alert_type: str, latitude: float, longitude: float,
                         max_retries: int = 2) -> Alert:
-    """
-    Validate, classify, persist, and log one alert.
+    logger.debug("processing_alert site_id=%s alert_type=%s", site_id, alert_type)
 
-    1. Validate input by constructing an Alert (fails fast, no retry)
-    2. Classify severity (pure domain logic)
-    3. Persist to DB with retry on failure
-    """
-    logger.debug("processing_alert site_id=%s type=%s", site_id, alert_type)
-
-    # --- Step 1: Validate (no retry — bad data won't fix itself) ---
     try:
-        severity = classify_alert(alert_type)
         alert = Alert(
             timestamp=timestamp,
             site_id=site_id,
             alert_type=alert_type,
-            severity=severity,
+            severity="",
             latitude=latitude,
             longitude=longitude,
         )
     except ValidationError:
-        logger.exception("validation_failed site_id=%s", site_id)
+        logger.exception("validation_failed")
         raise
 
-    # --- Step 2: Persist with bounded retries ---
-    for attempt in range(1, max_retries + 2):  # e.g. max_retries=2 → attempts 1,2,3
+    alert.severity = classify_alert(alert.alert_type)
+
+    for attempt in range(max_retries + 1):
         try:
             insert_alert(
-                conn, timestamp, site_id, alert_type,
-                alert.severity, latitude, longitude,
+                conn,
+                alert.timestamp,
+                alert.site_id,
+                alert.alert_type,
+                alert.severity,
+                alert.latitude,
+                alert.longitude,
             )
-            logger.info("alert_recorded site_id=%s severity=%s", site_id, alert.severity)
+            logger.info("alert_recorded")
             return alert
-        except Exception as exc:
-            if attempt <= max_retries:
+        except Exception:
+            if attempt < max_retries:
                 logger.warning(
-                    "retrying_persist attempt=%d/%d site_id=%s error=%s",
-                    attempt, max_retries, site_id, exc,
+                    "retrying_persist attempt=%s max_retries=%s",
+                    attempt + 1,
+                    max_retries,
                 )
-            else:
-                # All retries exhausted — log WITH traceback, then re-raise
-                logger.exception(
-                    "alert_processing_failed site_id=%s after %d retries",
-                    site_id, max_retries,
-                )
-                raise
+                continue
 
+            logger.exception("alert_processing_failed")
+            raise
 
-# Example usage
-if __name__ == "__main__":
-    settings = load_settings()
-    print(f"Running in {settings.env} with DB {settings.database_url}")
+    raise RuntimeError("unreachable")

@@ -9,6 +9,8 @@ load_dotenv()
 class Settings(BaseModel):
     """
     Application configuration sourced from environment variables.
+
+    Week 4 adds runtime config validation and log-level control.
     """
     env: str
     database_url: str
@@ -27,18 +29,22 @@ class Settings(BaseModel):
 
         Optional variables:
         - LOG_LEVEL (defaults to INFO)
+
+        Reads required values and validates quickly.
         """
-        env = os.getenv("APP_ENV")
-        database_url = os.getenv("DATABASE_URL")
-        api_token = os.getenv("API_TOKEN")
-        log_level = os.getenv("LOG_LEVEL", "INFO")
+        values = {
+            "env": os.getenv("APP_ENV"),
+            "database_url": os.getenv("DATABASE_URL"),
+            "api_token": os.getenv("API_TOKEN"),
+            "log_level": os.getenv("LOG_LEVEL", "INFO"),
+        }
 
         # Explicit check for missing vars (required by tests)
         missing = [
             k for k, v in {
-                "APP_ENV": env,
-                "DATABASE_URL": database_url,
-                "API_TOKEN": api_token,
+                "APP_ENV": values["env"],
+                "DATABASE_URL": values["database_url"],
+                "API_TOKEN": values["api_token"],
             }.items()
             if v is None
         ]
@@ -47,12 +53,7 @@ class Settings(BaseModel):
                 f"Missing required environment variables: {', '.join(missing)}"
             )
 
-        return cls(
-            env=env,
-            database_url=database_url,
-            api_token=api_token,
-            log_level=log_level,
-        )
+        return cls(**values)
 
     @field_validator("env")
     @classmethod
@@ -79,11 +80,10 @@ class Settings(BaseModel):
         return value
 
     @field_validator("log_level")
-    @classmethod
     def validate_log_level(cls, value):
-        valid = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
-        if value not in valid:
-            raise ValueError(
-                f"log_level must be one of: {', '.join(sorted(valid))}"
-            )
-        return value
+        normalized = value.upper()
+        allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+        if normalized not in allowed:
+            allowed_values = ", ".join(sorted(allowed))
+            raise ValueError(f"log_level must be one of: {allowed_values}")
+        return normalized
